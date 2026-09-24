@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function profilePath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+    function isAdmin() {
+      return signedIn() && exists(profilePath(request.auth.uid)) &&
+        get(profilePath(request.auth.uid)).data.role == 'admin';
+    }
+    function validName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 80;
+    }
+    function validRole(role) { return role in ['user', 'admin']; }
+    function validReportCategory(category) {
+      return category in [
+        'Road Hazard', 'Flood', 'Security', 'Fire', 'Accident',
+        'Poor Lighting', 'Environmental', 'Other'
+      ];
+    }
+    function validReportCreate(id) {
+      let r = request.resource.data;
+      return r.keys().hasAll([
+          'reportId', 'userId', 'title', 'description', 'category',
+          'latitude', 'longitude', 'address', 'imageUrl', 'status',
+          'verificationStatus', 'createdAt', 'updatedAt', 'reporterName'
+        ]) && r.keys().hasOnly([
+          'reportId', 'userId', 'title', 'description', 'category',
+          'latitude', 'longitude', 'address', 'imageUrl', 'status',
+          'verificationStatus', 'createdAt', 'updatedAt', 'reporterName'
+        ]) &&
+        r.reportId == id && r.userId == request.auth.uid &&
+        validName(r.reporterName) &&
+        r.reporterName == get(profilePath(request.auth.uid)).data.fullName &&
+        r.title is string && r.title.size() >= 5 && r.title.size() <= 100 &&
+        r.description is string && r.description.size() >= 20 &&
+          r.description.size() <= 1500 &&
+        validReportCategory(r.category) &&
+        r.latitude is number && r.latitude >= -90 && r.latitude <= 90 &&
+        r.longitude is number && r.longitude >= -180 && r.longitude <= 180 &&
+        r.address is string && r.address.size() >= 3 && r.address.size() <= 300 &&
+        r.imageUrl is string && r.imageUrl.size() <= 2048 &&
+        (r.imageUrl == '' ||
+          r.imageUrl.matches('^https://firebasestorage[.]googleapis[.]com/v0/b/[^/]+/o/risk_reports%2F.*')) &&
+        r.status == 'active' && r.verificationStatus == 'pending' &&
+        r.createdAt == request.time && r.updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      // Users may fetch only their own profile; only admins can list accounts.
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'fullName', 'email', 'photoUrl', 'role', 'createdAt'
+        ]) && request.resource.data.keys().hasAll([
+          'uid', 'fullName', 'email', 'photoUrl', 'role', 'createdAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        validName(request.resource.data.fullName) &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.photoUrl == '' &&
+        request.resource.data.role == 'user' &&
+        request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && (
+        (request.auth.uid == uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fullName', 'photoUrl']) &&
+          validName(request.resource.data.fullName) &&
+          request.resource.data.photoUrl == resource.data.photoUrl) ||
+        (isAdmin() &&
+          (request.auth.uid != uid || request.resource.data.role == 'admin') &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fullName', 'role']) &&
+          validName(request.resource.data.fullName) &&
+          validRole(request.resource.data.role))
+      );
+      allow delete: if false;
+
+      match /notifications/{notificationId} {
+        allow get, list: if signedIn() && request.auth.uid == uid;
+        // Notifications are created only by trusted Cloud Functions Admin SDK.
+        allow create, delete: if false;
+        allow update: if signedIn() && request.auth.uid == uid &&
+          resource.data.read == false && request.resource.data.read == true &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['read']);
+      }
+
+      match /devices/{deviceId} {
+        allow get, list, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['token', 'platform', 'updatedAt']) &&
+          request.resource.data.token is string &&
+          request.resource.data.token.size() >= 20 &&
+          request.resource.data.token.size() <= 4096 &&
+          request.resource.data.platform == 'android' &&
+          request.resource.data.updatedAt == request.time;
+      }
+    }
+
+    match /risk_reports/{reportId} {
+      allow get, list: if signedIn();
+      allow create: if signedIn() && exists(profilePath(request.auth.uid)) &&
+        validReportCreate(reportId);
+      // The author cannot mark their own report verified or resolved.
+      // Admins can ONLY change review/status fields and the update timestamp.
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'verificationStatus', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.status in ['active', 'resolved'] &&
+        request.resource.data.verificationStatus in [
+          'pending', 'verified', 'rejected'
+        ];
+      allow delete: if false;
+    }
+
+    match /report_flags/{flagId} {
+      allow get: if signedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() &&
+        request.resource.data.keys().hasOnly([
+          'reportId', 'userId', 'reason', 'createdAt'
+        ]) && request.resource.data.keys().hasAll([
+          'reportId', 'userId', 'reason', 'createdAt'
+        ]) &&
+        request.resource.data.reportId is string &&
+        request.resource.data.userId == request.auth.uid &&
+        flagId == request.resource.data.reportId + '_' + request.auth.uid &&
+        exists(/databases/$(database)/documents/risk_reports/$(request.resource.data.reportId)) &&
+        request.resource.data.reason is string &&
+        request.resource.data.reason.size() >= 10 &&
+        request.resource.data.reason.size() <= 500 &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
