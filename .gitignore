@@ -1,0 +1,27 @@
+# Flutter / Dart / IDE
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.iml
+.idea/
+.vscode/settings.json
+
+# Android build & machine-specific settings
+android/.gradle/
+android/captures/
+android/local.properties
+android/key.properties
+android/app/google-services.json
+*.jks
+*.keystore
+
+# Firebase project selection, credentials & server dependencies
+.firebaserc
+functions/node_modules/
+functions/.env*
+service-account*.json
