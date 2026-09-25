@@ -1,38 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/admin_stats.dart';
 import '../models/notification_model.dart';
 import '../models/risk_report_model.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
+import 'demo_mode.dart';
+import 'mock_store.dart';
 
-class AdminStats {
-  const AdminStats({
-    required this.users,
-    required this.reports,
-    required this.pending,
-    required this.verified,
-    required this.rejected,
-    required this.resolved,
-    required this.flags,
-  });
-  final int users;
-  final int reports;
-  final int pending;
-  final int verified;
-  final int rejected;
-  final int resolved;
-  final int flags;
-}
+export '../models/admin_stats.dart';
 
 class FirestoreService {
-  FirestoreService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
-  final FirebaseFirestore _db;
+  FirestoreService({FirebaseFirestore? firestore}) : _db = firestore;
+  final FirebaseFirestore? _db;
+
+  bool get _demo => DemoMode.enabled && _db == null;
+  FirebaseFirestore get _firestore => _db ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _reports =>
-      _db.collection('risk_reports');
+      _firestore.collection('risk_reports');
 
-  String newReportId() => _reports.doc().id;
+  String newReportId() => _demo ? MockStore.instance.newReportId() : _reports.doc().id;
 
   Stream<List<RiskReportModel>> watchReports({
     RiskCategory? category,
@@ -41,6 +29,12 @@ class FirestoreService {
     DateTime? since,
     int limit = AppConstants.resultsLimit,
   }) {
+    if (_demo) {
+      return MockStore.instance.watchReports(
+        category: category, status: status, verification: verification,
+        since: since, limit: limit,
+      );
+    }
     Query<Map<String, dynamic>> query = _reports;
     if (category != null) query = query.where('category', isEqualTo: category.label);
     if (status != null) query = query.where('status', isEqualTo: status.value);
@@ -55,14 +49,18 @@ class FirestoreService {
             .map(RiskReportModel.fromDocument).toList());
   }
 
-  Stream<List<RiskReportModel>> watchMyReports(String uid) => _reports
+  Stream<List<RiskReportModel>> watchMyReports(String uid) => _demo
+      ? MockStore.instance.watchReports(userId: uid)
+      : _reports
       .where('userId', isEqualTo: uid)
       .orderBy('createdAt', descending: true)
       .limit(AppConstants.resultsLimit)
       .snapshots()
       .map((snapshot) => snapshot.docs.map(RiskReportModel.fromDocument).toList());
 
-  Stream<RiskReportModel?> watchReport(String id) => _reports.doc(id).snapshots()
+  Stream<RiskReportModel?> watchReport(String id) => _demo
+      ? MockStore.instance.watchReport(id)
+      : _reports.doc(id).snapshots()
       .map((snapshot) => snapshot.exists ? RiskReportModel.fromDocument(snapshot) : null);
 
   Future<String> createReport({
@@ -76,8 +74,15 @@ class FirestoreService {
     required String address,
     required String imageUrl,
   }) async {
+    if (_demo) {
+      return MockStore.instance.createReport(
+        reportId: reportId, userId: userId, title: title,
+        description: description, category: category, latitude: latitude,
+        longitude: longitude, address: address, imageUrl: imageUrl,
+      );
+    }
     // Server read prevents a stale displayed name from impersonating another user.
-    final profile = await _db.collection('users').doc(userId)
+    final profile = await _firestore.collection('users').doc(userId)
         .get(const GetOptions(source: Source.server));
     final reporterName = profile.data()?['fullName'] as String?;
     if (reporterName == null || reporterName.trim().isEmpty) {
@@ -107,7 +112,12 @@ class FirestoreService {
     required String uid,
     required String reason,
   }) async {
-    final ref = _db.collection('report_flags').doc('${reportId}_$uid');
+    if (_demo) {
+      return MockStore.instance.flagReport(
+        reportId: reportId, uid: uid, reason: reason,
+      );
+    }
+    final ref = _firestore.collection('report_flags').doc('${reportId}_$uid');
     // Do not get a nonexistent flag first: rules deliberately deny reading
     // arbitrary nonexistent documents. Creation is one-per-user-and-report.
     try {
@@ -128,18 +138,30 @@ class FirestoreService {
     }
   }
 
-  Stream<List<NotificationModel>> watchNotifications(String uid) => _db
+  Stream<List<NotificationModel>> watchNotifications(String uid) => _demo
+      ? MockStore.instance.watchNotifications(uid)
+      : _firestore
       .collection('users').doc(uid).collection('notifications')
       .orderBy('createdAt', descending: true).limit(50)
       .snapshots().map((snap) => snap.docs.map(NotificationModel.fromDocument).toList());
 
-  Future<void> markNotificationRead(String uid, String id) => _db
+  Future<void> markNotificationRead(String uid, String id) {
+    if (_demo) {
+      MockStore.instance.markNotificationRead(uid, id);
+      return Future<void>.value();
+    }
+    return _firestore
       .collection('users').doc(uid).collection('notifications').doc(id)
       .update({'read': true});
+  }
 
   Future<void> reviewReport(
     String id, {ReportStatus? status, VerificationStatus? verification,
   }) async {
+    if (_demo) {
+      MockStore.instance.reviewReport(id, status: status, verification: verification);
+      return;
+    }
     final updates = <String, dynamic>{'updatedAt': FieldValue.serverTimestamp()};
     if (status != null) updates['status'] = status.value;
     if (verification != null) updates['verificationStatus'] = verification.value;
@@ -147,24 +169,33 @@ class FirestoreService {
     await _reports.doc(id).update(updates);
   }
 
-  Stream<List<UserModel>> watchUsers() => _db.collection('users')
+  Stream<List<UserModel>> watchUsers() => _demo
+      ? MockStore.instance.watchUsers()
+      : _firestore.collection('users')
       .orderBy('createdAt', descending: true).limit(100)
       .snapshots().map((snap) => snap.docs.map(UserModel.fromDocument).toList());
 
-  Future<void> setUserRole(String uid, {required bool admin}) => _db
-      .collection('users').doc(uid).update({'role': admin ? 'admin' : 'user'});
+  Future<void> setUserRole(String uid, {required bool admin}) {
+    if (_demo) {
+      MockStore.instance.setUserRole(uid, admin: admin);
+      return Future<void>.value();
+    }
+    return _firestore.collection('users').doc(uid)
+        .update({'role': admin ? 'admin' : 'user'});
+  }
 
   Future<AdminStats> adminStats() async {
+    if (_demo) return MockStore.instance.adminStats();
     Future<int> count(Query<Map<String, dynamic>> query) async =>
         (await query.count().get()).count ?? 0;
     final results = await Future.wait([
-      count(_db.collection('users')),
+      count(_firestore.collection('users')),
       count(_reports),
       count(_reports.where('verificationStatus', isEqualTo: 'pending')),
       count(_reports.where('verificationStatus', isEqualTo: 'verified')),
       count(_reports.where('verificationStatus', isEqualTo: 'rejected')),
       count(_reports.where('status', isEqualTo: 'resolved')),
-      count(_db.collection('report_flags')),
+      count(_firestore.collection('report_flags')),
     ]);
     return AdminStats(
       users: results[0], reports: results[1], pending: results[2],
@@ -173,12 +204,14 @@ class FirestoreService {
     );
   }
 
-  Stream<List<Map<String, dynamic>>> watchFlags(String reportId) => _db
-      .collection('report_flags').where('reportId', isEqualTo: reportId)
+  Stream<List<Map<String, dynamic>>> watchFlags(String reportId) => _demo
+      ? MockStore.instance.watchFlags(reportId)
+      : _firestore.collection('report_flags').where('reportId', isEqualTo: reportId)
       .limit(20).snapshots().map((snap) => snap.docs.map((doc) => doc.data()).toList());
 
-  Stream<List<Map<String, dynamic>>> watchAllFlags() => _db
-      .collection('report_flags').orderBy('createdAt', descending: true)
+  Stream<List<Map<String, dynamic>>> watchAllFlags() => _demo
+      ? MockStore.instance.watchAllFlags()
+      : _firestore.collection('report_flags').orderBy('createdAt', descending: true)
       .limit(100).snapshots()
       .map((snap) => snap.docs.map((doc) => doc.data()).toList());
 }

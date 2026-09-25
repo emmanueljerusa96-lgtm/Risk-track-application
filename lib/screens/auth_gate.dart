@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models/session_user.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -17,10 +17,10 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final _auth = AuthService();
-  late final Stream<User?> _authStream = _auth.authStateChanges;
+  late final Stream<SessionUser?> _authStream = _auth.authStateChanges;
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<User?>(
+  Widget build(BuildContext context) => StreamBuilder<SessionUser?>(
         stream: _authStream,
         builder: (context, authSnapshot) {
           if (authSnapshot.connectionState == ConnectionState.waiting) {

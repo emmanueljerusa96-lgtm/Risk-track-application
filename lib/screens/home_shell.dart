@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../app/routes.dart';
+import '../models/session_user.dart';
 import '../models/user_model.dart';
+import '../services/demo_mode.dart';
 import '../services/notification_service.dart';
+import '../utils/constants.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 import 'notifications_screen.dart';
@@ -17,7 +19,7 @@ import 'search_reports_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.user, required this.profile});
-  final User user;
+  final SessionUser user;
   final UserModel profile;
 
   @override
@@ -36,6 +38,7 @@ class _HomeShellState extends State<HomeShell> {
     NotificationService.instance.resumeIfEnabled(widget.user.uid).catchError(
       (Object _) {},
     );
+    if (DemoMode.enabled) return;
     _foregroundMessages = FirebaseMessaging.onMessage.listen((message) {
       if (!mounted || message.notification == null) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -98,7 +101,10 @@ class _HomeShellState extends State<HomeShell> {
       _ => const SizedBox.shrink(),
     };
     return Scaffold(
-      body: screen,
+      body: Column(children: [
+        if (DemoMode.enabled) const _SampleBanner(),
+        Expanded(child: screen),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selected,
         onDestinationSelected: (index) {
@@ -123,4 +129,20 @@ class _HomeShellState extends State<HomeShell> {
       ),
     );
   }
+}
+
+class _SampleBanner extends StatelessWidget {
+  const _SampleBanner();
+
+  @override
+  Widget build(BuildContext context) => const Material(
+        color: AppColors.mint,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Text(
+            'Sample data, not live community reports. Sign out to switch accounts.',
+            style: TextStyle(color: AppColors.deepTeal, fontSize: 12, height: 1.35),
+          ),
+        ),
+      );
 }

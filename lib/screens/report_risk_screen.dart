@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../app/routes.dart';
+import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/location_service.dart';
@@ -155,6 +156,7 @@ class _ReportRiskScreenState extends State<ReportRiskScreen> {
         latitude: _location!.latitude, longitude: _location!.longitude,
         address: _location!.address, imageUrl: photo?.url ?? '',
       );
+      await AnalyticsService.instance.logReportSubmitted(_category!.name);
       if (mounted) Navigator.of(context).pop(reportId);
     } catch (error) {
       if (photo != null) {

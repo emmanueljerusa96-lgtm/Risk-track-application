@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/routes.dart';
+import '../services/demo_mode.dart';
 import '../services/firestore_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -30,9 +31,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const Text('Overview', style: TextStyle(fontSize: 24,
             fontWeight: FontWeight.w800, color: AppColors.ink)),
           const SizedBox(height: 5),
-          const Text('Live counts on refresh; reviews are enforced by '
-            'Firestore security rules.',
-            style: TextStyle(color: AppColors.muted)),
+          Text(DemoMode.enabled
+              ? 'Sample counts on this device. They reset when the app restarts.'
+              : 'Live counts on refresh; reviews are enforced by '
+                'Firestore security rules.',
+            style: const TextStyle(color: AppColors.muted)),
           const SizedBox(height: 19),
           FutureBuilder<AdminStats>(future: _stats, builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {

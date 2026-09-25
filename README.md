@@ -15,6 +15,8 @@
 - Recent-report search, category/status/review/date filters and an optional GPS distance filter.
 - Admin counts, report verification/rejection/resolution, review of flags and role management. **Firestore and Storage rules enforce access**, not just hidden buttons.
 - In-app Firestore notifications and optional opt-in FCM pushes sent by trusted Cloud Functions when admins review reports. Clients cannot send their own notifications.
+- Google Analytics for Firebase. Automatic sessions, plus sign-in, sign-up, screen, and report-submitted events. Email, location, report text, and the advertising ID are not sent. Usage analytics can be turned off in Settings.
+- Sample data mode so the app can be used before Firebase is connected. It is on by default (`DemoMode.preferSampleData`). Sign in as `ada@risktrack.app` / `demo1234` or `admin@risktrack.app` / `admin1234`. Set `preferSampleData` to `false` to use a live Firebase project instead.
 - Flutter tests, notification-function tests, Firestore emulator security tests and deployable rules/indexes.
 
 ## Requirements
@@ -50,8 +52,8 @@ Flutter normally writes `android/local.properties` automatically when it builds;
 
 Without Firebase configuration, the APK can open but shows a **Connect Firebase** setup screen rather than pretending authentication/reports work.
 
-1. Create a project in the [Firebase Console](https://console.firebase.google.com/). Add an **Android** app with application ID **`com.risktrack.community`** (or change this ID consistently in `android/app/build.gradle.kts`, `MainActivity.kt`, its directory and the map User-Agent before registering). The ID is an example package name, **not** an existing Firebase project ID.
-2. Download the real `google-services.json` for that app and copy it to **`android/app/google-services.json`**. Never replace it with invented values. The Android Google Services Gradle plugin applies automatically only when this file exists. Rebuild the app after adding the file. Android uses this file for `Firebase.initializeApp()`; there is no generated `firebase_options.dart` to edit.
+1. Create a project in the [Firebase Console](https://console.firebase.google.com/). Add an **Android** app with application ID **`com.risktrack.app`**. That ID is the Android package name in `android/app/build.gradle.kts`, `MainActivity.kt`, and the map User-Agent. It is **not** a Firebase project ID.
+2. Download the real `google-services.json` for that app and copy it to **`android/app/google-services.json`**. Never replace it with invented values. The Android Google Services plugin (`com.google.gms.google-services` **4.5.0**) is applied in the app module. If that file is missing, the build warns and continues so the Connect Firebase screen can still open. Rebuild after adding the file. Android uses this file for `Firebase.initializeApp()`; there is no generated `firebase_options.dart` to edit. Firebase Analytics is already declared with BoM **34.19.0** (`firebase-analytics`, no separate version). Enable Google Analytics on the Firebase project if the console asks. Collection starts only after this file is present and the app is rebuilt.
 3. Enable **Authentication → Sign-in method → Email/Password** and configure the email action template/sender for reset emails.
 4. Create **Cloud Firestore** and **Cloud Storage** in your project (choose the appropriate region and plan). Deploy the restrictive rules/indexes below **before** inviting users. Do **not** leave production data in Firebase test mode.
 5. Install the Firebase CLI, sign in on **your machine**, choose **your own** project and deploy:
@@ -125,13 +127,41 @@ The result, **only if the command succeeds**, is `build/app/outputs/flutter-apk/
 
 For a 4 GB computer, keep the Android emulator closed, use the physical phone, avoid parallel Gradle builds and let the first dependency/Gradle download finish. `android/gradle.properties` caps the Gradle heap/workers.
 
+### GitHub Actions
+
+`.github/workflows/android-release.yml` builds a release APK and AAB on pushes to `main`, on version tags, and when the workflow is run manually. It does not store Firebase or signing files in Git. Add these Actions secrets on the repository (Settings → Secrets and variables → Actions), or run `scripts/set-github-secrets.ps1` from a machine that already has `gh` logged in with permission to manage secrets:
+
+| Secret | Value |
+| --- | --- |
+| `GOOGLE_SERVICES_JSON` | Full contents of `android/app/google-services.json`. Required. Package name must be `com.risktrack.app`. |
+| `ANDROID_KEYSTORE_BASE64` | Base64 of `android/upload-keystore.jks`. Omit all four signing secrets for a debug-signed test build. |
+| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` from `android/key.properties`. |
+| `ANDROID_KEY_PASSWORD` | `keyPassword` from `android/key.properties`. |
+| `ANDROID_KEY_ALIAS` | `keyAlias` from `android/key.properties` (the example uses `upload`). |
+
+Create the upload key once, then keep the `.jks` and passwords outside Git:
+
+```powershell
+keytool -genkeypair -v -keystore android/upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+copy android/key.properties.example android/key.properties
+```
+
+Set the real passwords in the ignored `android/key.properties`. `storeFile` must stay `../upload-keystore.jks`. Then:
+
+```powershell
+.\scripts\set-github-secrets.ps1
+```
+
+A build without the four signing secrets is debug-signed and must not be published. Artifacts are kept for 14 days.
+
 ## Troubleshooting
 
 | Problem | Check |
 | --- | --- |
 | `flutter` not found | Install Flutter and add its `bin` directory to Windows PATH; open a new terminal. |
 | No Android device | USB debugging, device authorization prompt, data cable, Windows OEM USB driver, `adb devices -l` and `flutter devices`. |
-| Setup screen after adding JSON | Ensure `android/app/google-services.json` matches the **application ID**; rebuild and check `flutter doctor -v`. |
+| Setup screen after adding JSON | Ensure `android/app/google-services.json` matches the **application ID**, set `DemoMode.preferSampleData` to false, rebuild, and check `flutter doctor -v`. |
+| Gradle warns that `google-services.json` is missing | Expected until the file is added. The app still builds and shows Connect Firebase. |
 | `permission-denied` | Deploy the included rules/indexes, confirm sign-in/profile creation and check the admin role if reviewing. New accounts cannot self-promote. |
 | Firestore index error | Deploy `firestore.indexes.json`, then wait for Firebase to build the indexes. |
 | Map blank | Internet access, OSM tile policy/rate limit and the correct User-Agent; the app does not bundle map tiles. |
@@ -139,6 +169,7 @@ For a 4 GB computer, keep the Android emulator closed, use the physical phone, a
 | Camera/gallery upload fails | Use a JPG or PNG smaller than 5 MB, check Storage setup/rules/plan and network. |
 | In-app review notification absent | Deploy Functions; reports still submit without Functions. For push, tap **Enable alerts** and grant Android notification permission. |
 | Build out of memory | Close other apps, use the phone (not emulator), keep Gradle at 2 workers and ensure Java/Android SDK agree with `flutter doctor -v`. |
+| Actions build fails before Gradle | Add `GOOGLE_SERVICES_JSON`. For a Play upload, also add the four `ANDROID_KEYSTORE_*` / `ANDROID_KEY_*` secrets. |
 
 ### Current workspace verification
 

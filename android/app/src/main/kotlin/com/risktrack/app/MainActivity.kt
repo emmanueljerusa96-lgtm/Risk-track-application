@@ -1,4 +1,4 @@
-package com.risktrack.community
+package com.risktrack.app
 
 import io.flutter.embedding.android.FlutterActivity
 

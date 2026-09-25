@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'demo_mode.dart';
+
 /// Optional push: only requests notification permission after an explicit tap.
 /// The secure Cloud Function, never the phone, sends FCM messages.
 class NotificationService {
@@ -19,6 +21,10 @@ class NotificationService {
   Future<bool> isEnabled() async => await _prefs.getBool(_enabledKey) ?? false;
 
   Future<bool> enable(String uid) async {
+    if (DemoMode.enabled) {
+      await _prefs.setBool(_enabledKey, true);
+      return true;
+    }
     final settings = await FirebaseMessaging.instance.requestPermission();
     if (settings.authorizationStatus != AuthorizationStatus.authorized &&
         settings.authorizationStatus != AuthorizationStatus.provisional) {
@@ -30,7 +36,7 @@ class NotificationService {
   }
 
   Future<void> resumeIfEnabled(String uid) async {
-    if (!await isEnabled()) return;
+    if (DemoMode.enabled || !await isEnabled()) return;
     _currentUid = uid;
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) await _saveToken(uid, token);
@@ -59,6 +65,10 @@ class NotificationService {
   }
 
   Future<void> disable(String uid) async {
+    if (DemoMode.enabled) {
+      await _prefs.setBool(_enabledKey, false);
+      return;
+    }
     _currentUid = null;
     await _tokenSubscription?.cancel();
     _tokenSubscription = null;

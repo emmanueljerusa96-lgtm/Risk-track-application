@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/user_model.dart';
+import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
@@ -18,6 +19,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _enabled = false;
+  bool _analytics = true;
   bool _busy = false;
 
   @override
@@ -29,8 +31,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     try {
       final value = await NotificationService.instance.isEnabled();
-      if (mounted) setState(() => _enabled = value);
+      final analytics = await AnalyticsService.instance.isEnabled();
+      if (mounted) setState(() {
+        _enabled = value;
+        _analytics = analytics;
+      });
     } catch (_) {}
+  }
+
+  Future<void> _toggleAnalytics(bool enable) async {
+    setState(() => _analytics = enable);
+    await AnalyticsService.instance.setEnabled(enable);
   }
 
   Future<void> _toggle(bool enable) async {
@@ -117,6 +128,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('GPS is requested only when you choose to use it.'),
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () => LocationService().openAppSettings()),
+              SwitchListTile(
+                secondary: const Icon(Icons.insights_outlined),
+                title: const Text('Usage analytics'),
+                subtitle: const Text('App usage only, after Firebase is connected. '
+                  'Email, location, report text, and the advertising ID are not included.'),
+                value: _analytics, onChanged: _toggleAnalytics),
             ])),
           const SizedBox(height: 22),
           const DisclaimerCard(),

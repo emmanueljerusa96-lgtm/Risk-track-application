@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -33,6 +34,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await AuthService().register(
         fullName: _name.text, email: _email.text, password: _password.text);
+      await AnalyticsService.instance.logSignUp();
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       if (mounted) {
