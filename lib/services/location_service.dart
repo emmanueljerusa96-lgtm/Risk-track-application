@@ -32,12 +32,10 @@ class LocationFailure implements Exception {
 }
 
 class LocationService {
-  /// Check whether location services are enabled on the device.
   Future<bool> isLocationServiceEnabled() async {
     return Geolocator.isLocationServiceEnabled();
   }
 
-  /// Check and request the required location permission.
   Future<LocationPermission> checkPermission() async {
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -46,7 +44,6 @@ class LocationService {
     return permission;
   }
 
-  /// Get the user's current GPS position, reporting actionable failures.
   Future<Position> _getPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationFailure(
@@ -82,7 +79,6 @@ class LocationService {
     }
   }
 
-  /// Compatibility API used by the screens.
   Future<LocationResult> currentLocation() async {
     final position = await _getPosition();
     return LocationResult(
@@ -92,7 +88,6 @@ class LocationService {
     );
   }
 
-  /// Get the user's current GPS position.
   Future<Position?> getCurrentLocation() async {
     try {
       return await _getPosition();
@@ -101,13 +96,18 @@ class LocationService {
     }
   }
 
-  /// Convert latitude and longitude into a readable address.
   Future<String> getAddressFromCoordinates(
     double latitude,
     double longitude,
   ) async {
     try {
-      final results = await placemarkFromCoordinates(latitude, longitude);
+      // geocoding 5 exposes the platform API rather than the old top-level
+      // helper. Calling it directly also avoids resolving the old helper as
+      // a LocationService member.
+      final results = await GeocodingPlatform.instance.placemarkFromCoordinates(
+        latitude,
+        longitude,
+      );
       if (results.isEmpty) return 'Unknown location';
       final place = results.first;
       final parts = <String>[
@@ -124,11 +124,9 @@ class LocationService {
     }
   }
 
-  /// Compatibility API used by the map picker.
   Future<String> reverseGeocode(double latitude, double longitude) =>
       getAddressFromCoordinates(latitude, longitude);
 
-  /// Get the current position and convert it to a readable address.
   Future<Map<String, dynamic>?> getCurrentLocationWithAddress() async {
     final position = await getCurrentLocation();
     if (position == null) return null;
@@ -143,7 +141,6 @@ class LocationService {
     };
   }
 
-  /// Listen continuously for location changes.
   Stream<Position> getLocationStream() {
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
@@ -155,11 +152,7 @@ class LocationService {
   Future<String> getAddressFromPosition(Position position) =>
       getAddressFromCoordinates(position.latitude, position.longitude);
 
-  /// Open the operating system's location settings.
   Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
 
-  /// Open this application's settings page.
-  Future<bool> openAppSettings() async {
-    return launchUrl(Uri.parse('app-settings:'));
-  }
+  Future<bool> openAppSettings() => launchUrl(Uri.parse('app-settings:'));
 }
