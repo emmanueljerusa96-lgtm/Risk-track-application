@@ -38,6 +38,29 @@ class RiskReportModel {
   bool get hasImage => imageUrl.isNotEmpty;
   bool get isVerified => verificationStatus == VerificationStatus.verified;
 
+  RiskReportModel copyWith({
+    ReportStatus? status,
+    VerificationStatus? verificationStatus,
+    DateTime? updatedAt,
+    String? imageUrl,
+    String? reporterName,
+  }) => RiskReportModel(
+        reportId: reportId,
+        userId: userId,
+        title: title,
+        description: description,
+        category: category,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+        imageUrl: imageUrl ?? this.imageUrl,
+        status: status ?? this.status,
+        verificationStatus: verificationStatus ?? this.verificationStatus,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        reporterName: reporterName ?? this.reporterName,
+      );
+
   factory RiskReportModel.fromDocument(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {

@@ -16,6 +16,7 @@
 - Admin counts, report verification/rejection/resolution, review of flags and role management. **Firestore and Storage rules enforce access**, not just hidden buttons.
 - In-app Firestore notifications and optional opt-in FCM pushes sent by trusted Cloud Functions when admins review reports. Clients cannot send their own notifications.
 - Google Analytics for Firebase. Automatic sessions, plus sign-in, sign-up, screen, and report-submitted events. Email, location, report text, and the advertising ID are not sent. Usage analytics can be turned off in Settings.
+- Sample data mode so the app can be used before Firebase is connected. It is on by default (`DemoMode.preferSampleData`). Sign in as `ada@risktrack.app` / `demo1234` or `admin@risktrack.app` / `admin1234`. Set `preferSampleData` to `false` to use a live Firebase project instead.
 - Flutter tests, notification-function tests, Firestore emulator security tests and deployable rules/indexes.
 
 ## Requirements
@@ -159,7 +160,7 @@ A build without the four signing secrets is debug-signed and must not be publish
 | --- | --- |
 | `flutter` not found | Install Flutter and add its `bin` directory to Windows PATH; open a new terminal. |
 | No Android device | USB debugging, device authorization prompt, data cable, Windows OEM USB driver, `adb devices -l` and `flutter devices`. |
-| Setup screen after adding JSON | Ensure `android/app/google-services.json` matches the **application ID**; rebuild and check `flutter doctor -v`. |
+| Setup screen after adding JSON | Ensure `android/app/google-services.json` matches the **application ID**, set `DemoMode.preferSampleData` to false, rebuild, and check `flutter doctor -v`. |
 | Gradle warns that `google-services.json` is missing | Expected until the file is added. The app still builds and shows Connect Firebase. |
 | `permission-denied` | Deploy the included rules/indexes, confirm sign-in/profile creation and check the admin role if reviewing. New accounts cannot self-promote. |
 | Firestore index error | Deploy `firestore.indexes.json`, then wait for Firebase to build the indexes. |

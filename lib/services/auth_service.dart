@@ -1,22 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/session_user.dart';
 import '../models/user_model.dart';
+import 'demo_mode.dart';
+import 'mock_store.dart';
 
 class AuthService {
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-      : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+      : _auth = auth,
+        _firestore = firestore;
 
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth? _auth;
+  final FirebaseFirestore? _firestore;
 
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  bool get _demo => DemoMode.enabled && _auth == null && _firestore == null;
+  FirebaseAuth get _firebaseAuth => _auth ?? FirebaseAuth.instance;
+  FirebaseFirestore get _firebaseDb => _firestore ?? FirebaseFirestore.instance;
 
-  Stream<UserModel?> watchProfile(String uid) => _firestore
-      .collection('users').doc(uid).snapshots()
-      .map((snapshot) => snapshot.exists ? UserModel.fromDocument(snapshot) : null);
+  SessionUser? get currentUser => _demo
+      ? MockStore.instance.currentUser
+      : _session(_firebaseAuth.currentUser);
+
+  Stream<SessionUser?> get authStateChanges => _demo
+      ? MockStore.instance.authChanges
+      : _firebaseAuth.authStateChanges().map(_session);
+
+  Stream<UserModel?> watchProfile(String uid) => _demo
+      ? MockStore.instance.watchProfile(uid)
+      : _firebaseDb.collection('users').doc(uid).snapshots()
+          .map((snapshot) => snapshot.exists ? UserModel.fromDocument(snapshot) : null);
+
+  SessionUser? _session(User? user) => user == null
+      ? null
+      : SessionUser(uid: user.uid, email: user.email, displayName: user.displayName);
 
   Future<void> register({
     required String fullName,
@@ -25,14 +42,20 @@ class AuthService {
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
     final name = fullName.trim();
-    final credentials = await _auth.createUserWithEmailAndPassword(
+    if (_demo) {
+      MockStore.instance.register(
+        fullName: name, email: normalizedEmail, password: password,
+      );
+      return;
+    }
+    final credentials = await _firebaseAuth.createUserWithEmailAndPassword(
       email: normalizedEmail, password: password,
     );
     final user = credentials.user;
     if (user == null) throw StateError('Sign-up did not return a user.');
     await user.updateDisplayName(name);
     // Role is forced to user by Firestore rules; this does not grant admin.
-    await _firestore.collection('users').doc(user.uid).set({
+    await _firebaseDb.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'fullName': name,
       'email': normalizedEmail,
@@ -43,26 +66,36 @@ class AuthService {
   }
 
   Future<void> login({required String email, required String password}) async {
-    await _auth.signInWithEmailAndPassword(
+    if (_demo) {
+      MockStore.instance.signIn(email: email, password: password);
+      return;
+    }
+    await _firebaseAuth.signInWithEmailAndPassword(
       email: email.trim(), password: password,
     );
   }
 
-  Future<void> resetPassword(String email) => _auth.sendPasswordResetEmail(
-        email: email.trim(),
-      );
+  Future<void> resetPassword(String email) {
+    if (_demo) return Future<void>.value();
+    return _firebaseAuth.sendPasswordResetEmail(email: email.trim());
+  }
 
   Future<void> updateFullName(String uid, String name) async {
-    await _firestore.collection('users').doc(uid).update({'fullName': name.trim()});
-    await _auth.currentUser?.updateDisplayName(name.trim());
+    if (_demo) {
+      MockStore.instance.updateFullName(uid, name);
+      return;
+    }
+    await _firebaseDb.collection('users').doc(uid).update({'fullName': name.trim()});
+    await _firebaseAuth.currentUser?.updateDisplayName(name.trim());
   }
 
   /// Recovery for a registration interrupted before its Firestore write.
   /// Use a server read so cached absence can never overwrite an admin profile.
   Future<void> recoverProfile() async {
-    final user = _auth.currentUser;
+    if (_demo) return;
+    final user = _firebaseAuth.currentUser;
     if (user == null || user.email == null) return;
-    final ref = _firestore.collection('users').doc(user.uid);
+    final ref = _firebaseDb.collection('users').doc(user.uid);
     final existing = await ref.get(const GetOptions(source: Source.server));
     if (existing.exists) return;
     final name = (user.displayName ?? '').trim();
@@ -76,5 +109,11 @@ class AuthService {
     });
   }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() {
+    if (_demo) {
+      MockStore.instance.signOut();
+      return Future<void>.value();
+    }
+    return _firebaseAuth.signOut();
+  }
 }

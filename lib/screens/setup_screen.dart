@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../app/routes.dart';
+import '../services/demo_mode.dart';
+import '../services/mock_store.dart';
 import '../utils/constants.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/risk_logo.dart';
@@ -19,21 +21,28 @@ class SetupScreen extends StatelessWidget {
             const Spacer(),
             const RiskLogo(size: 68),
             const SizedBox(height: 36),
-            Text('Connect Firebase to continue',
+            Text('Firebase is not connected',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800, color: AppColors.ink)),
             const SizedBox(height: 12),
             const Text(
-              'This build has no Firebase configuration yet. The project owner '
-              'needs to register this Android app in Firebase and place '
-              'google-services.json in android/app/, then rebuild the app. '
-              'See README.md for the exact steps.',
+              'Firebase is not connected, so the app can keep running on sample '
+              'reports stored on this device. To use your own project later, add '
+              'google-services.json and set DemoMode.preferSampleData to false.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.muted, height: 1.5),
             ),
             const Spacer(),
-            CustomButton(label: 'Try again', icon: Icons.refresh,
-              onPressed: () => AppRoutes.replace(context, const SplashScreen())),
+            CustomButton(label: 'Continue with sample data', icon: Icons.explore_outlined,
+              onPressed: () {
+                DemoMode.enabled = true;
+                MockStore.instance.signInSampleMember();
+                AppRoutes.replace(context, const SplashScreen());
+              }),
+            const SizedBox(height: 10),
+            TextButton(onPressed: () => AppRoutes.replace(context,
+                const SplashScreen(tryFirebase: true)),
+              child: const Text('Try Firebase again')),
           ]),
         )),
       );

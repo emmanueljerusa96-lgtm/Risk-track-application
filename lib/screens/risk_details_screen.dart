@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -131,11 +133,7 @@ class _RiskDetailsScreenState extends State<RiskDetailsScreen> {
               children: [
                 if (report.hasImage) ...[
                   ClipRRect(borderRadius: BorderRadius.circular(17),
-                    child: Image.network(report.imageUrl, height: 220,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        height: 110, color: AppColors.mint,
-                        child: const Center(child: Text('Photo unavailable'))))),
+                    child: _reportImage(report.imageUrl)),
                   const SizedBox(height: 17),
                 ],
                 Row(children: [
@@ -248,4 +246,19 @@ class _RiskDetailsScreenState extends State<RiskDetailsScreen> {
 
   Widget _heading(String text) => Text(text, style: const TextStyle(
     fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.ink));
+}
+
+Widget _reportImage(String url) {
+  final path = url.startsWith('file://') ? url.substring(7) : url;
+  final local = path.startsWith('/') || path.contains(r':\');
+  const fallback = SizedBox(height: 110, child: ColoredBox(
+    color: AppColors.mint,
+    child: Center(child: Text('Photo unavailable')),
+  ));
+  if (local) {
+    return Image.file(File(path), height: 220, width: double.infinity,
+      fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback);
+  }
+  return Image.network(url, height: 220, width: double.infinity,
+    fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback);
 }

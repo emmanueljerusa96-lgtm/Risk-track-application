@@ -8,6 +8,7 @@ import '../services/location_service.dart';
 abstract final class AppHelpers {
   static String friendlyError(Object error) {
     if (error is LocationFailure) return error.message;
+    if (error is AuthFailure) return error.message;
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-email':
@@ -92,5 +93,10 @@ abstract final class AppHelpers {
 
 class PhotoFailure implements Exception {
   const PhotoFailure(this.message);
+  final String message;
+}
+
+class AuthFailure implements Exception {
+  const AuthFailure(this.message);
   final String message;
 }
