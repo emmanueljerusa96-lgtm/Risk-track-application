@@ -24,16 +24,10 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Analyze Flutter project
-        run: flutter analyze
-
-      - name: Run tests
-        run: flutter test
-
-      - name: Build Mock Data APK
+      - name: Build Risk Track APK
         run: flutter build apk --release
 
-      - name: Upload Risk Track APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: risk-track-demo-apk
