@@ -20,7 +20,7 @@ abstract final class AppConstants {
       'Community reports are submitted by people, not official safety alerts. '
       'Pending reports are unverified. Exercise judgment, check official sources '
       'for important decisions, and call local emergency services if needed.';
-  static const mapUserAgent = 'com.risktrack.community';
+  static const mapUserAgent = 'com.risktrack.app';
   static const mapTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const mapAttribution = '© OpenStreetMap contributors';
   static const mapAttributionUrl = 'https://www.openstreetmap.org/copyright';

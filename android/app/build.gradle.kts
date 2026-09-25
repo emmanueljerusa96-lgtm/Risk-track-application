@@ -1,3 +1,4 @@
+import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.util.Properties
 
 plugins {
@@ -5,12 +6,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     // The Flutter plugin must follow the Android and Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
-// Allows a build without Firebase credentials; the app then shows a setup page.
-// After registering the Android app in Firebase, add android/app/google-services.json.
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
+// A checkout without credentials must still build and show Connect Firebase.
+// Adding android/app/google-services.json makes this plugin process it.
+googleServices {
+    missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
 }
 
 val signingProperties = Properties()
@@ -20,7 +22,7 @@ if (signingFile.exists()) {
 }
 
 android {
-    namespace = "com.risktrack.community"
+    namespace = "com.risktrack.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.risktrack.community"
+        applicationId = "com.risktrack.app"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -67,4 +69,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation("com.google.firebase:firebase-analytics")
 }

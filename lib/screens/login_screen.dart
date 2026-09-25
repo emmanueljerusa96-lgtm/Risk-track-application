@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/routes.dart';
+import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = true);
     try {
       await AuthService().login(email: _email.text, password: _password.text);
+      await AnalyticsService.instance.logLogin();
       // AuthGate replaces this child when Firebase publishes the signed-in user.
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(

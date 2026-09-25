@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/routes.dart';
+import '../services/analytics_service.dart';
 import '../utils/constants.dart';
 import '../widgets/risk_logo.dart';
 import 'auth_gate.dart';
@@ -29,6 +30,11 @@ class _SplashScreenState extends State<SplashScreen> {
     } catch (_) {
       if (mounted) AppRoutes.replace(context, const SetupScreen());
       return;
+    }
+    try {
+      await AnalyticsService.instance.applyPreference();
+    } catch (_) {
+      // Measurement must not block the rest of startup.
     }
     bool seen = false;
     try {
