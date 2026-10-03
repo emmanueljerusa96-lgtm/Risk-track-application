@@ -1,32 +1,28 @@
 name: Publish Risk Track web app
 
-# Builds the Flutter web app and publishes it to GitHub Pages, so the project
-# can be opened from any browser (Chrome, Edge, phone) through one HTTPS link.
+# Builds the Flutter web app, and publishes it to GitHub Pages so the project
+# can be opened from any browser (Chrome, Edge, or a phone) through one HTTPS
+# link.
 #
-# Before the first successful deploy, enable Pages once:
-#   Repository -> Settings -> Pages -> Build and deployment -> Source:
-#   "GitHub Actions".
+# One-time setup, once per repository:
+#   1. Repository -> Settings -> Pages -> Build and deployment -> Source:
+#      "GitHub Actions".
+#   2. Optional: add the FIREBASE_WEB_* secrets (see below) so the published
+#      site talks to your Firebase project instead of the built-in sample data.
 #
-# Firebase settings are read from repository secrets. When they are absent the
-# build still succeeds and the published app runs in sample-data mode, so the
-# link is never broken:
-#   Settings -> Secrets and variables -> Actions -> New repository secret
-#     FIREBASE_WEB_API_KEY
-#     FIREBASE_WEB_APP_ID
-#     FIREBASE_WEB_MESSAGING_SENDER_ID
-#     FIREBASE_WEB_PROJECT_ID
-#     FIREBASE_WEB_AUTH_DOMAIN          (optional)
-#     FIREBASE_WEB_STORAGE_BUCKET       (optional)
-#     FIREBASE_WEB_MEASUREMENT_ID       (optional)
-# Values come from Firebase Console -> Project settings -> Your apps -> Web app.
+# Secret names (Settings -> Secrets and variables -> Actions), values copied
+# from Firebase Console -> Project settings -> Your apps -> Web app:
+#   FIREBASE_WEB_API_KEY, FIREBASE_WEB_APP_ID, FIREBASE_WEB_MESSAGING_SENDER_ID,
+#   FIREBASE_WEB_PROJECT_ID, and optionally FIREBASE_WEB_AUTH_DOMAIN,
+#   FIREBASE_WEB_STORAGE_BUCKET, FIREBASE_WEB_MEASUREMENT_ID.
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-  # Pull requests are built and tested too, which checks a change before it is
-  # merged. Only a push to main deploys to Pages.
+  # Pull requests are analyzed, tested and built as well, so a change is
+  # checked before it is merged. Only main is deployed.
   pull_request:
     branches:
       - main
@@ -41,7 +37,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build web release
+    name: Analyze, test and build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -58,8 +54,7 @@ jobs:
         run: flutter pub get
 
       # Analyzer and test output is echoed and turned into workflow
-      # annotations, so a failure is readable in the Checks tab without
-      # downloading logs.
+      # annotations, so a failure can be read in the Checks tab.
       - name: Analyze
         run: |
           set +e
@@ -87,28 +82,6 @@ jobs:
             tail -n 120 test.log
           fi
           exit $status
-
-      # TEMPORARY DIAGNOSTIC: publishes the analyzer or test output on the pull
-      # request so a failure can be read without downloading log archives.
-      # Remove together with the pull-requests: write permission above.
-      - name: Publish failure output on the pull request
-        if: failure() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          {
-            echo 'Automated diagnostic output from the Flutter workflow (`flutter analyze` / `flutter test`).'
-            echo
-            for file in analyze.log test.log; do
-              if [ -f "$file" ]; then
-                echo "**$file**"
-                echo '```'
-                head -c 60000 "$file"
-                echo '```'
-              fi
-            done
-          } > failure-report.md
-          gh pr comment "${{ github.event.number }}" --body-file failure-report.md || true
 
       - name: Write Firebase settings for the web build
         env:
@@ -153,17 +126,9 @@ jobs:
       - name: Add .nojekyll
         run: touch build/web/.nojekyll
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-      # Kept as a separate artifact so a build can be inspected or downloaded
-      # from any branch, even when Pages only deploys from main.
-      - name: Upload downloadable web build
+      # Always produced, on any branch: a failing or unfinished deployment must
+      # never cost the team a working, downloadable build.
+      - name: Upload web build
         uses: actions/upload-artifact@v4
         with:
           name: risk-track-web
@@ -182,6 +147,37 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download the built web app
+        uses: actions/download-artifact@v4
+        with:
+          name: risk-track-web
+          path: build/web
+
+      # Reports a friendly warning instead of a red build when the one-time
+      # Pages switch has not been flipped yet.
+      - name: Check that GitHub Pages is enabled
+        id: pages-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=GitHub Pages is not enabled::Open Settings -> Pages -> Build and deployment -> Source: GitHub Actions, then re-run this workflow. Until then, the web build is attached to this run as the risk-track-web artifact."
+          fi
+
+      - name: Configure Pages
+        if: steps.pages-check.outputs.enabled == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: steps.pages-check.outputs.enabled == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
       - name: Deploy
         id: deployment
+        if: steps.pages-check.outputs.enabled == 'true'
         uses: actions/deploy-pages@v4
