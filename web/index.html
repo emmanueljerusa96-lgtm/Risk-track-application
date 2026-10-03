@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly. `flutter build web --base-href /repo-name/` fills it
+    in automatically, which is what the GitHub Pages workflow uses.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Risk Track - community risk reports on a map, built with Flutter and Firebase.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#087E74">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Risk Track">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Risk Track</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!--
+    Shown until the Flutter engine paints its first frame, then removed by the
+    flutter-first-frame listener below. It never accepts pointer events, so it
+    cannot block the app.
+  -->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #F6F8F7;
+    }
+    #boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: linear-gradient(160deg, #F6F8F7 0%, #E5F5EE 100%);
+      font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+      pointer-events: none;
+    }
+    #boot .mark {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #087E74 0%, #075F59 100%);
+      box-shadow: 0 10px 26px rgba(8, 126, 116, .22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #boot .mark svg { width: 46px; height: 46px; }
+    #boot .name {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -.6px;
+      color: #17323B;
+    }
+    #boot .tagline {
+      font-size: 13px;
+      color: #657780;
+      margin-top: -10px;
+    }
+    #boot .wheel {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #DFE8E4;
+      border-top-color: #087E74;
+      border-radius: 50%;
+      animation: spin 900ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="boot" role="status" aria-live="polite">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="#FFFFFF">
+        <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/>
+      </svg>
+    </div>
+    <div class="name">Risk Track</div>
+    <div class="tagline">Track. Report. Stay Aware.</div>
+    <div class="wheel"></div>
+  </div>
+  <noscript>
+    Risk Track needs JavaScript. Please enable it, or install the Android app.
+  </noscript>
+
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Flutter fires this once the first frame is on screen.
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (boot) boot.remove();
+    });
+  </script>
+</body>
+</html>

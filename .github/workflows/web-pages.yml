@@ -1,0 +1,139 @@
+name: Publish Risk Track web app
+
+# Builds the Flutter web app and publishes it to GitHub Pages, so the project
+# can be opened from any browser (Chrome, Edge, phone) through one HTTPS link.
+#
+# Before the first successful deploy, enable Pages once:
+#   Repository -> Settings -> Pages -> Build and deployment -> Source:
+#   "GitHub Actions".
+#
+# Firebase settings are read from repository secrets. When they are absent the
+# build still succeeds and the published app runs in sample-data mode, so the
+# link is never broken:
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     FIREBASE_WEB_API_KEY
+#     FIREBASE_WEB_APP_ID
+#     FIREBASE_WEB_MESSAGING_SENDER_ID
+#     FIREBASE_WEB_PROJECT_ID
+#     FIREBASE_WEB_AUTH_DOMAIN          (optional)
+#     FIREBASE_WEB_STORAGE_BUCKET       (optional)
+#     FIREBASE_WEB_MEASUREMENT_ID       (optional)
+# Values come from Firebase Console -> Project settings -> Your apps -> Web app.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  # Pull requests are built and tested too, which checks a change before it is
+  # merged. Only a push to main deploys to Pages.
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build web release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Write Firebase settings for the web build
+        env:
+          API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+          APP_ID: ${{ secrets.FIREBASE_WEB_APP_ID }}
+          SENDER_ID: ${{ secrets.FIREBASE_WEB_MESSAGING_SENDER_ID }}
+          PROJECT_ID: ${{ secrets.FIREBASE_WEB_PROJECT_ID }}
+          AUTH_DOMAIN: ${{ secrets.FIREBASE_WEB_AUTH_DOMAIN }}
+          STORAGE_BUCKET: ${{ secrets.FIREBASE_WEB_STORAGE_BUCKET }}
+          MEASUREMENT_ID: ${{ secrets.FIREBASE_WEB_MEASUREMENT_ID }}
+        run: |
+          mkdir -p config
+          cat > config/firebase-config.json <<JSON
+          {
+            "FIREBASE_API_KEY": "${API_KEY}",
+            "FIREBASE_APP_ID": "${APP_ID}",
+            "FIREBASE_MESSAGING_SENDER_ID": "${SENDER_ID}",
+            "FIREBASE_PROJECT_ID": "${PROJECT_ID}",
+            "FIREBASE_AUTH_DOMAIN": "${AUTH_DOMAIN}",
+            "FIREBASE_STORAGE_BUCKET": "${STORAGE_BUCKET}",
+            "FIREBASE_MEASUREMENT_ID": "${MEASUREMENT_ID}"
+          }
+          JSON
+          if [ -z "${API_KEY}" ]; then
+            echo "::warning title=Sample data build::No FIREBASE_WEB_* secrets were found, so this build falls back to the built-in sample reports."
+          else
+            echo "Firebase web settings found for project ${PROJECT_ID}."
+          fi
+
+      # The base href must match the repository name because Pages serves the
+      # project from https://<owner>.github.io/<repository>/.
+      - name: Build web release
+        run: |
+          BASE_HREF="/${GITHUB_REPOSITORY#*/}/"
+          echo "Building for $BASE_HREF"
+          flutter build web \
+            --release \
+            --base-href "$BASE_HREF" \
+            --dart-define-from-file=config/firebase-config.json
+
+      # Stops GitHub Pages from running Jekyll over the build output.
+      - name: Add .nojekyll
+        run: touch build/web/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      # Kept as a separate artifact so a build can be inspected or downloaded
+      # from any branch, even when Pages only deploys from main.
+      - name: Upload downloadable web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-track-web
+          path: build/web
+          retention-days: 14
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

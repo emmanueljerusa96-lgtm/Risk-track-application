@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -248,17 +249,39 @@ class _RiskDetailsScreenState extends State<RiskDetailsScreen> {
     fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.ink));
 }
 
+/// Shows an uploaded photo on any platform.
+///
+/// Live reports carry a Firebase Storage HTTPS URL. Sample reports carry a
+/// `data:` URL, because `dart:io` files do not exist in a browser build.
 Widget _reportImage(String url) {
-  final path = url.startsWith('file://') ? url.substring(7) : url;
-  final local = path.startsWith('/') || path.contains(r':\');
   const fallback = SizedBox(height: 110, child: ColoredBox(
     color: AppColors.mint,
     child: Center(child: Text('Photo unavailable')),
   ));
-  if (local) {
-    return Image.file(File(path), height: 220, width: double.infinity,
+  if (url.startsWith('data:image')) {
+    final bytes = _decodeDataUrl(url);
+    if (bytes == null) return fallback;
+    return Image.memory(bytes, height: 220, width: double.infinity,
       fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback);
   }
-  return Image.network(url, height: 220, width: double.infinity,
-    fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback);
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return Image.network(url, height: 220, width: double.infinity,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) => progress == null
+          ? child
+          : const SizedBox(height: 110, child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2))),
+      errorBuilder: (_, _, _) => fallback);
+  }
+  return fallback;
+}
+
+Uint8List? _decodeDataUrl(String value) {
+  final comma = value.indexOf(',');
+  if (comma < 0 || comma == value.length - 1) return null;
+  try {
+    return base64Decode(value.substring(comma + 1));
+  } catch (_) {
+    return null;
+  }
 }

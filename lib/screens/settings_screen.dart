@@ -65,6 +65,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _message(String text) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(text)));
 
+  /// Browsers keep location permission per site, so there is no app settings
+  /// page to open; the user is pointed at the browser control instead.
+  Future<void> _openLocationSettings() async {
+    final opened = await LocationService().openAppSettings();
+    if (!opened && mounted) {
+      _message('This build has no system settings page. Change location '
+        'permission in your browser site settings, then retry.');
+    }
+  }
+
   Future<void> _editName() async {
     final name = TextEditingController(text: widget.profile.fullName);
     final form = GlobalKey<FormState>();
@@ -120,14 +130,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(children: [
               SwitchListTile(
                 title: const Text('Push notifications'),
-                subtitle: const Text('Optional admin review updates. '
-                  'In-app notifications do not need this permission.'),
-                value: _enabled, onChanged: _busy ? null : _toggle),
+                subtitle: Text(NotificationService.isSupported
+                  ? 'Optional admin review updates. '
+                    'In-app notifications do not need this permission.'
+                  : 'Not available in the browser build. '
+                    'In-app review updates still arrive in Alerts.'),
+                value: NotificationService.isSupported && _enabled,
+                onChanged: (NotificationService.isSupported && !_busy)
+                    ? _toggle : null),
               ListTile(leading: const Icon(Icons.location_on_outlined),
                 title: const Text('Location permission'),
                 subtitle: const Text('GPS is requested only when you choose to use it.'),
                 trailing: const Icon(Icons.open_in_new),
-                onTap: () => LocationService().openAppSettings()),
+                onTap: _openLocationSettings),
               SwitchListTile(
                 secondary: const Icon(Icons.insights_outlined),
                 title: const Text('Usage analytics'),
