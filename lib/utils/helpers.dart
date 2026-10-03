@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
+// firebase_auth re-exports the FirebaseException type used below, so an extra
+// firebase_core import would be redundant.
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 import '../services/location_service.dart';
 

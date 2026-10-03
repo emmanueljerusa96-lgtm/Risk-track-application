@@ -17,8 +17,8 @@ class AdminGate extends StatefulWidget {
 
 class _AdminGateState extends State<AdminGate> {
   late final String? _uid = AuthService().currentUser?.uid;
-  late final Stream<UserModel?>? _profile = _uid == null
-      ? null : AuthService().watchProfile(_uid!);
+  late final Stream<UserModel?>? _profile =
+      _uid == null ? null : AuthService().watchProfile(_uid);
 
   @override
   Widget build(BuildContext context) => Scaffold(
