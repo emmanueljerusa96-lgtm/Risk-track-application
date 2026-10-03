@@ -190,14 +190,18 @@ This security test verifies owner-only profile access, no self-promotion, owner/
 
 ## 6. Publish the web app with GitHub Pages
 
-`.github/workflows/web-pages.yml` runs `flutter analyze`, `flutter test` and `flutter build web`, then publishes `build/web` to GitHub Pages whenever `main` is updated. Before the first deploy, enable Pages once:
+`.github/workflows/web-pages.yml` runs `flutter analyze`, `flutter test` and `flutter build web`, then publishes `build/web` to GitHub Pages whenever `main` is updated. Every run also attaches the built site as the **risk-track-web** artifact, so a pull request can be previewed by downloading and serving that folder (`python -m http.server` inside it), and a failed deployment never costs you a working build.
 
-1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+One-time setup:
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions.** Until this is done the deploy job prints a warning with this exact instruction instead of failing the build.
 2. **Settings → Secrets and variables → Actions**, then add the Firebase web values from *Project settings → Your apps → Web app*:
    `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, `FIREBASE_WEB_MESSAGING_SENDER_ID`, `FIREBASE_WEB_PROJECT_ID`, and optionally `FIREBASE_WEB_AUTH_DOMAIN`, `FIREBASE_WEB_STORAGE_BUCKET`, `FIREBASE_WEB_MEASUREMENT_ID`.
    Without these secrets the workflow still publishes, and the site opens in sample-data mode.
 3. In **Firebase Console → Authentication → Settings → Authorized domains**, add `<your-user>.github.io` so the hosted site can use email sign-in and password resets.
-4. Push to `main` (or run the workflow manually from the Actions tab). The job prints the published address: `https://<your-user>.github.io/<repository>/`.
+4. Merge the change into `main` (or run the workflow manually from the Actions tab and merge afterwards - only `main` deploys). The job prints the published address: `https://<your-user>.github.io/<repository>/`.
+
+The address is stable: every later push to `main` replaces the site. Share that one link with users, and open it on a phone to use the app without installing anything.
 
 The workflow can also be run manually on any branch; it then builds and tests without deploying, and keeps the web build as a downloadable artifact. The `--base-href` is derived from the repository name automatically, which is what makes the sub-path URL work.
 
