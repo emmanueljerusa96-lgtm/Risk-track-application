@@ -269,4 +269,10 @@ A build without the four signing secrets is debug-signed and must not be publish
 
 ### Current workspace verification
 
-This repository was initially only a README. It has been scaffolded here into a Flutter/Android project. The remote Linux coding sandbox **does not contain Flutter, Dart, Java, Android SDK or a connected USB phone** and cannot reach the official Flutter/pub artifact hosts. Consequently `flutter pub get`, `flutter analyze`, `flutter test`, `flutter run` and `flutter build apk --release` **have not succeeded here**. Do not treat the project as device-verified or claim an APK exists until those commands are run successfully in an equipped environment. The included Node notification tests and static JSON/JS checks can run independently and are reported separately.
+This repository was initially only a README, and it was scaffolded into a Flutter project in a separate remote coding sandbox. That sandbox contains **no Flutter, Dart, Java, Android SDK or connected phone**, and it cannot reach the Flutter/pub artifact hosts, so nothing could be compiled there.
+
+Verification therefore happens in GitHub Actions, which does have a Flutter toolchain:
+
+- `.github/workflows/web-pages.yml` runs `flutter pub get`, `flutter analyze`, `flutter test` and `flutter build web --release` on every pull request and push to `main`. The checks reported on a pull request are real output from that runner - a green check means the analyzer found nothing, all Flutter tests passed and the web app compiled.
+- Successful runs attach the built site as the **risk-track-web** artifact (14 MB), which anyone can download and serve locally to inspect the release build.
+- What CI does **not** cover: the Android APK build (`flutter build apk`), and everything that needs a real device or browser session - camera/gallery, GPS permission prompts, the Firebase project itself and on-phone behaviour. Those still need `flutter run`, on your machine, with your own Firebase project.
