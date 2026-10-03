@@ -22,6 +22,7 @@ android/app/google-services.json
 
 # Firebase project selection, credentials & server dependencies
 .firebaserc
+config/firebase-config.json
 functions/node_modules/
 functions/.env*
 service-account*.json

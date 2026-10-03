@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/splash_screen.dart';
 import '../services/analytics_service.dart';
+import '../widgets/app_viewport.dart';
 import 'theme.dart';
 
 class RiskTrackApp extends StatelessWidget {
@@ -15,6 +16,8 @@ class RiskTrackApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         navigatorObservers: [_analyticsObserver],
+        builder: (context, child) =>
+            AppViewport(child: child ?? const SizedBox.shrink()),
         home: const SplashScreen(),
       );
 }

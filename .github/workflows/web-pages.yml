@@ -1,0 +1,182 @@
+name: Publish Risk Track web app
+
+# Builds the Flutter web app, and publishes it to GitHub Pages so the project
+# can be opened from any browser (Chrome, Edge, or a phone) through one HTTPS
+# link.
+#
+# One-time setup, once per repository:
+#   1. Repository -> Settings -> Pages -> Build and deployment -> Source:
+#      "GitHub Actions".
+#   2. Optional: add the FIREBASE_WEB_* secrets (see below) so the published
+#      site talks to your Firebase project instead of the built-in sample data.
+#
+# Secret names (Settings -> Secrets and variables -> Actions), values copied
+# from Firebase Console -> Project settings -> Your apps -> Web app:
+#   FIREBASE_WEB_API_KEY, FIREBASE_WEB_APP_ID, FIREBASE_WEB_MESSAGING_SENDER_ID,
+#   FIREBASE_WEB_PROJECT_ID, and optionally FIREBASE_WEB_AUTH_DOMAIN,
+#   FIREBASE_WEB_STORAGE_BUCKET, FIREBASE_WEB_MEASUREMENT_ID.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  # Pull requests are analyzed, tested and built as well, so a change is
+  # checked before it is merged. Only main is deployed.
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyze, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # Analyzer and test output is echoed and turned into workflow
+      # annotations, so a failure can be read in the Checks tab.
+      - name: Analyze
+        run: |
+          set +e
+          flutter analyze > analyze.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            head -n 40 analyze.log | while IFS= read -r line; do
+              echo "::error title=flutter analyze::$line"
+            done
+            echo "----- flutter analyze output -----"
+            cat analyze.log
+          fi
+          exit $status
+
+      - name: Test
+        run: |
+          set +e
+          flutter test > test.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            grep -E "^[0-9]{2}:[0-9]{2} \+" test.log | tail -n 20 | while IFS= read -r line; do
+              echo "::error title=flutter test::$line"
+            done
+            echo "----- flutter test output (last 120 lines) -----"
+            tail -n 120 test.log
+          fi
+          exit $status
+
+      - name: Write Firebase settings for the web build
+        env:
+          API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+          APP_ID: ${{ secrets.FIREBASE_WEB_APP_ID }}
+          SENDER_ID: ${{ secrets.FIREBASE_WEB_MESSAGING_SENDER_ID }}
+          PROJECT_ID: ${{ secrets.FIREBASE_WEB_PROJECT_ID }}
+          AUTH_DOMAIN: ${{ secrets.FIREBASE_WEB_AUTH_DOMAIN }}
+          STORAGE_BUCKET: ${{ secrets.FIREBASE_WEB_STORAGE_BUCKET }}
+          MEASUREMENT_ID: ${{ secrets.FIREBASE_WEB_MEASUREMENT_ID }}
+        run: |
+          mkdir -p config
+          cat > config/firebase-config.json <<JSON
+          {
+            "FIREBASE_API_KEY": "${API_KEY}",
+            "FIREBASE_APP_ID": "${APP_ID}",
+            "FIREBASE_MESSAGING_SENDER_ID": "${SENDER_ID}",
+            "FIREBASE_PROJECT_ID": "${PROJECT_ID}",
+            "FIREBASE_AUTH_DOMAIN": "${AUTH_DOMAIN}",
+            "FIREBASE_STORAGE_BUCKET": "${STORAGE_BUCKET}",
+            "FIREBASE_MEASUREMENT_ID": "${MEASUREMENT_ID}"
+          }
+          JSON
+          if [ -z "${API_KEY}" ]; then
+            echo "::warning title=Sample data build::No FIREBASE_WEB_* secrets were found, so this build falls back to the built-in sample reports."
+          else
+            echo "Firebase web settings found for project ${PROJECT_ID}."
+          fi
+
+      # The base href must match the repository name because Pages serves the
+      # project from https://<owner>.github.io/<repository>/.
+      - name: Build web release
+        run: |
+          BASE_HREF="/${GITHUB_REPOSITORY#*/}/"
+          echo "Building for $BASE_HREF"
+          flutter build web \
+            --release \
+            --base-href "$BASE_HREF" \
+            --dart-define-from-file=config/firebase-config.json
+
+      # Stops GitHub Pages from running Jekyll over the build output.
+      - name: Add .nojekyll
+        run: touch build/web/.nojekyll
+
+      # Always produced, on any branch: a failing or unfinished deployment must
+      # never cost the team a working, downloadable build.
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-track-web
+          path: build/web
+          retention-days: 14
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download the built web app
+        uses: actions/download-artifact@v4
+        with:
+          name: risk-track-web
+          path: build/web
+
+      # Reports a friendly warning instead of a red build when the one-time
+      # Pages switch has not been flipped yet.
+      - name: Check that GitHub Pages is enabled
+        id: pages-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=GitHub Pages is not enabled::Open Settings -> Pages -> Build and deployment -> Source: GitHub Actions, then re-run this workflow. Until then, the web build is attached to this run as the risk-track-web artifact."
+          fi
+
+      - name: Configure Pages
+        if: steps.pages-check.outputs.enabled == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: steps.pages-check.outputs.enabled == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy
+        id: deployment
+        if: steps.pages-check.outputs.enabled == 'true'
+        uses: actions/deploy-pages@v4

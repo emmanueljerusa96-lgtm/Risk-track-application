@@ -1,0 +1,56 @@
+{
+  // Press F5 in VS Code and pick a configuration from the list.
+  //
+  // The two "Firebase" configurations read their settings from
+  // config/firebase-config.json, which is not committed. Copy
+  // config/firebase-config.example.json to that name and paste the values from
+  // Firebase Console -> Project settings -> Your apps -> Web app.
+  //
+  // "sample data" needs no Firebase project: it runs the built-in demo reports
+  // so the interface can always be demonstrated.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Risk Track · Chrome (Firebase)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": [
+        "--dart-define-from-file=config/firebase-config.json",
+        "--web-port=5273"
+      ]
+    },
+    {
+      "name": "Risk Track · Edge (Firebase)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "edge",
+      "args": [
+        "--dart-define-from-file=config/firebase-config.json",
+        "--web-port=5273"
+      ]
+    },
+    {
+      "name": "Risk Track · Chrome (sample data)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": [
+        "--dart-define=USE_SAMPLE_DATA=true",
+        "--web-port=5273"
+      ]
+    },
+    {
+      "name": "Risk Track · Android phone",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define-from-file=config/firebase-config.json"
+      ]
+    }
+  ]
+}

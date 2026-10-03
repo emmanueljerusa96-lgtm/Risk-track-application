@@ -80,14 +80,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Get optional push alerts', style: TextStyle(
-                    fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text(NotificationService.isSupported
+                      ? 'Get optional push alerts'
+                      : 'In-app updates are on',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700, color: AppColors.ink)),
                   const SizedBox(height: 4),
-                  const Text('In-app updates work without push. We only '
-                    'request notification permission if you choose to enable it.',
-                    style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                  TextButton(onPressed: _busy ? null : _enable,
-                    child: Text(_busy ? 'Enabling…' : 'Enable alerts')),
+                  Text(NotificationService.isSupported
+                      ? 'In-app updates work without push. We only request '
+                        'notification permission if you choose to enable it.'
+                      : 'This browser build has no push transport. Reviews of '
+                        'your reports still arrive here in Alerts.',
+                    style: const TextStyle(
+                      color: AppColors.muted, fontSize: 12)),
+                  if (NotificationService.isSupported)
+                    TextButton(onPressed: _busy ? null : _enable,
+                      child: Text(_busy ? 'Enabling…' : 'Enable alerts')),
                 ]),
             ),
           Expanded(child: StreamBuilder<List<NotificationModel>>(

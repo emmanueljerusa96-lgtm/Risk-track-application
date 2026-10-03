@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
@@ -32,6 +33,7 @@ class _ReportRiskScreenState extends State<ReportRiskScreen> {
   RiskCategory? _category;
   LocationResult? _location;
   XFile? _image;
+  Uint8List? _preview;
   bool _busy = false;
   bool _locating = false;
 
@@ -48,13 +50,21 @@ class _ReportRiskScreenState extends State<ReportRiskScreen> {
   }
 
   Future<void> _restorePhoto() async {
-    // Android may kill the app while the camera/gallery intent is open.
+    // Android may kill the app while the camera/gallery intent is open. The
+    // browser has no lost-data recovery, so this runs on phones only.
+    if (kIsWeb) return;
     try {
       final lost = await ImagePicker().retrieveLostData();
       if (!mounted || lost.isEmpty) return;
       final files = lost.files;
       if (files != null && files.isNotEmpty) {
-        setState(() => _image = files.first);
+        final bytes = await files.first.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _image = files.first;
+            _preview = bytes;
+          });
+        }
       }
     } catch (_) {
       // The user can simply choose the photo again.
@@ -67,27 +77,40 @@ class _ReportRiskScreenState extends State<ReportRiskScreen> {
         source: source, imageQuality: 75, maxWidth: 1600, maxHeight: 1600,
       );
       if (image == null) return;
-      if (await image.length() > AppConstants.maxImageBytes) {
+      final bytes = await image.readAsBytes();
+      if (bytes.length > AppConstants.maxImageBytes) {
         throw const PhotoFailure('Choose a photo smaller than 5 MB.');
       }
-      if (mounted) setState(() => _image = image);
+      if (mounted) {
+        setState(() {
+          _image = image;
+          _preview = bytes;
+        });
+      }
     } catch (error) {
       if (mounted) _showError(AppHelpers.friendlyError(error));
     }
   }
+
+  void _removePhoto() => setState(() {
+        _image = null;
+        _preview = null;
+      });
 
   void _showPhotoOptions() => showModalBottomSheet<void>(
         context: context,
         builder: (sheetContext) => SafeArea(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Take a photo'), onTap: () {
-                Navigator.pop(sheetContext);
-                _pickPhoto(ImageSource.camera);
-              }),
+            if (!kIsWeb)
+              ListTile(leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take a photo'), onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickPhoto(ImageSource.camera);
+                }),
             ListTile(leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from gallery'), onTap: () {
+              title: Text(kIsWeb ? 'Choose a photo file' : 'Choose from gallery'),
+              onTap: () {
                 Navigator.pop(sheetContext);
                 _pickPhoto(ImageSource.gallery);
               }),
@@ -227,18 +250,21 @@ class _ReportRiskScreenState extends State<ReportRiskScreen> {
               const Text('Avoid including faces, number plates, or private information.',
                 style: TextStyle(fontSize: 12, color: AppColors.muted)),
               const SizedBox(height: 10),
-              if (_image != null) ...[
+              if (_image != null && _preview != null) ...[
                 ClipRRect(borderRadius: BorderRadius.circular(14),
-                  child: Image.file(File(_image!.path),
-                    height: 170, fit: BoxFit.cover,
+                  // Image.memory works on a phone and in a browser, where
+                  // dart:io File objects do not exist.
+                  child: Image.memory(_preview!,
+                    height: 170, width: double.infinity,
+                    fit: BoxFit.cover, gaplessPlayback: true,
                     errorBuilder: (_, _, _) => const SizedBox(height: 80,
                       child: Center(child: Text('Could not preview photo'))))),
-                TextButton.icon(onPressed: () => setState(() => _image = null),
+                TextButton.icon(onPressed: _removePhoto,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Remove photo')),
               ] else OutlinedButton.icon(onPressed: _showPhotoOptions,
                 icon: const Icon(Icons.add_a_photo_outlined),
-                label: const Text('Camera or gallery')),
+                label: Text(kIsWeb ? 'Choose a photo' : 'Camera or gallery')),
               if (_image != null)
                 OutlinedButton.icon(onPressed: _showPhotoOptions,
                   icon: const Icon(Icons.swap_horiz),

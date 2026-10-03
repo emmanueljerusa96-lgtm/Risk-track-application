@@ -38,7 +38,8 @@ class _HomeShellState extends State<HomeShell> {
     NotificationService.instance.resumeIfEnabled(widget.user.uid).catchError(
       (Object _) {},
     );
-    if (DemoMode.enabled) return;
+    // Push is Android-only in this build, and sample mode has no push at all.
+    if (DemoMode.enabled || !NotificationService.isSupported) return;
     _foregroundMessages = FirebaseMessaging.onMessage.listen((message) {
       if (!mounted || message.notification == null) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

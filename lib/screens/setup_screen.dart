@@ -26,9 +26,11 @@ class SetupScreen extends StatelessWidget {
                 fontWeight: FontWeight.w800, color: AppColors.ink)),
             const SizedBox(height: 12),
             const Text(
-              'Firebase is not connected, so the app can keep running on sample '
-              'reports stored on this device. To use your own project later, add '
-              'google-services.json and set DemoMode.preferSampleData to false.',
+              'Firebase is not connected, so the app can keep running on the '
+              'built-in sample reports. To use your own project, add '
+              'google-services.json for Android and/or pass the web settings '
+              'with --dart-define-from-file=config/firebase-config.json, '
+              'then rebuild.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.muted, height: 1.5),
             ),

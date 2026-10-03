@@ -23,6 +23,11 @@ dependencies:
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
 
+  # HTTPS calls used by the browser build for OpenStreetMap address lookup.
+  # An address provider that works from JavaScript is required because the
+  # `geocoding` plugin only implements Android, iOS and macOS.
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
