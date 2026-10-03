@@ -33,6 +33,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: web-pages
@@ -86,6 +87,28 @@ jobs:
             tail -n 120 test.log
           fi
           exit $status
+
+      # TEMPORARY DIAGNOSTIC: publishes the analyzer or test output on the pull
+      # request so a failure can be read without downloading log archives.
+      # Remove together with the pull-requests: write permission above.
+      - name: Publish failure output on the pull request
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo 'Automated diagnostic output from the Flutter workflow (`flutter analyze` / `flutter test`).'
+            echo
+            for file in analyze.log test.log; do
+              if [ -f "$file" ]; then
+                echo "**$file**"
+                echo '```'
+                head -c 60000 "$file"
+                echo '```'
+              fi
+            done
+          } > failure-report.md
+          gh pr comment "${{ github.event.number }}" --body-file failure-report.md || true
 
       - name: Write Firebase settings for the web build
         env:
