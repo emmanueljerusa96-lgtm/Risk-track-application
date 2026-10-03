@@ -8,7 +8,12 @@ class AnalyticsService {
   AnalyticsService._();
   static final AnalyticsService instance = AnalyticsService._();
 
-  final _prefs = SharedPreferencesAsync();
+  // Created on first use: constructing it eagerly throws in environments where
+  // no preferences platform is registered (for example unit tests), and every
+  // call site below already tolerates a failing preferences read.
+  static SharedPreferencesAsync? _prefsInstance;
+  SharedPreferencesAsync get _prefs => _prefsInstance ??= SharedPreferencesAsync();
+
   static const _enabledKey = 'risk_track_analytics_enabled';
 
   bool get _ready {
