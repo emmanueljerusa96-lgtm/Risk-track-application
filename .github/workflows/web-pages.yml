@@ -56,11 +56,36 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      # Analyzer and test output is echoed and turned into workflow
+      # annotations, so a failure is readable in the Checks tab without
+      # downloading logs.
       - name: Analyze
-        run: flutter analyze
+        run: |
+          set +e
+          flutter analyze > analyze.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            head -n 40 analyze.log | while IFS= read -r line; do
+              echo "::error title=flutter analyze::$line"
+            done
+            echo "----- flutter analyze output -----"
+            cat analyze.log
+          fi
+          exit $status
 
       - name: Test
-        run: flutter test
+        run: |
+          set +e
+          flutter test > test.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            grep -E "^[0-9]{2}:[0-9]{2} \+" test.log | tail -n 20 | while IFS= read -r line; do
+              echo "::error title=flutter test::$line"
+            done
+            echo "----- flutter test output (last 120 lines) -----"
+            tail -n 120 test.log
+          fi
+          exit $status
 
       - name: Write Firebase settings for the web build
         env:
